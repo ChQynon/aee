@@ -99,8 +99,22 @@ module.exports = async (req, res) => {
                 const text = update.message.text;
                 const userId = update.message.from.id;
                 const username = update.message.from.username || `user${userId}`;
+                const chatType = update.message.chat.type;
                 
-                console.log(`Сообщение: ${text} от ${chatId}`);
+                console.log(`Сообщение: ${text} от ${chatId}, тип чата: ${chatType}`);
+                
+                // Игнорируем обычные сообщения в групповых чатах
+                if (chatType === 'group' || chatType === 'supergroup') {
+                    if (text.startsWith('/start')) {
+                        await bot.sendMessage(chatId, 
+                            "Привет! Чтобы подать заявку в хаус Sunset, напиши мне в личные сообщения."
+                        );
+                    }
+                    // Никак не реагируем на обычные сообщения в группе
+                    return res.status(200).send('OK');
+                }
+                
+                // Далее обрабатываем только сообщения из личных чатов
                 
                 // Обработка команд
                 if (text === '/start') {
@@ -373,7 +387,10 @@ module.exports = async (req, res) => {
                             break;
                             
                         default:
-                            await bot.sendMessage(chatId, "Чтобы начать заполнение анкеты, отправь /start");
+                            // Проверяем, что это личный чат, прежде чем отвечать
+                            if (chatType === 'private') {
+                                await bot.sendMessage(chatId, "Чтобы начать заполнение анкеты, отправь /start");
+                            }
                             break;
                     }
                 }
