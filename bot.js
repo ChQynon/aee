@@ -44,8 +44,16 @@ bot.getMe().then(botInfo => {
 
 // Для Vercel - обработка вебхука
 if (process.env.VERCEL_URL) {
-    // Экспортируем бота для использования в api/webhook.js
-    module.exports = { bot };
+    // Экспортируем бота и данные для использования в других файлах
+    module.exports = { 
+        bot,
+        pendingForms,
+        processedForms
+    };
+} else {
+    // Делаем данные доступными глобально для локальной разработки
+    global.pendingForms = pendingForms;
+    global.processedForms = processedForms;
 }
 
 // Хранилище для состояний пользователей
