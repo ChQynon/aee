@@ -441,8 +441,52 @@ module.exports = async (req, res) => {
                 
                 // При обработке webhook сначала разбираемся с командами начала/отмены заполнения,
                 // так как они не зависят от прав администратора
-                
-                return res.status(200).send('OK');
+                if (data === 'confirm' && userStates[chatId] === STATES.AWAITING_CONFIRMATION) {
+                    // Базовый ответ для отладки
+                    await bot.answerCallbackQuery(callbackQuery.id, {
+                        text: "Анкета отправлена на рассмотрение",
+                        show_alert: true
+                    });
+                    
+                    await bot.sendMessage(chatId, "Анкета принята к рассмотрению!");
+                    userStates[chatId] = STATES.IDLE;
+                    
+                    console.log("Обработано подтверждение анкеты");
+                    return res.status(200).send('OK');
+                }
+                else if (data === 'restart') {
+                    // Базовый ответ для отладки
+                    await bot.answerCallbackQuery(callbackQuery.id, {
+                        text: "Начинаем заново",
+                        show_alert: true
+                    });
+                    
+                    await bot.sendMessage(chatId, "Давай начнем заново. Напиши /start");
+                    userStates[chatId] = STATES.IDLE;
+                    
+                    console.log("Обработана перезагрузка анкеты");
+                    return res.status(200).send('OK');
+                }
+                else if (data.startsWith('accept_') || data.startsWith('reject_')) {
+                    // Базовый ответ для отладки
+                    await bot.answerCallbackQuery(callbackQuery.id, {
+                        text: data.startsWith('accept_') ? "Анкета принята" : "Анкета отклонена",
+                        show_alert: true
+                    });
+                    
+                    console.log(`Обработана кнопка ${data}`);
+                    return res.status(200).send('OK');
+                }
+                else {
+                    // Неизвестная кнопка
+                    await bot.answerCallbackQuery(callbackQuery.id, {
+                        text: "Неизвестная команда",
+                        show_alert: true
+                    });
+                    
+                    console.log(`Получена неизвестная команда: ${data}`);
+                    return res.status(200).send('OK');
+                }
             }
             
             return res.status(200).send('OK');
