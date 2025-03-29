@@ -1,19 +1,31 @@
 const express = require('express');
 const path = require('path');
-const { bot } = require('./bot');
+const TelegramBot = require('node-telegram-bot-api');
+
+console.log('⭐ Запуск server.js...');
+
+// Токен бота
+const token = process.env.TELEGRAM_BOT_TOKEN || '7417777601:AAGy92M0pjoizRHILNT7d72xMNf8a0BkKK8';
 
 // Создаем Express приложение
 const app = express();
 const port = process.env.PORT || 3000;
 
-// Настройка EJS как шаблонизатора
-app.set('view engine', 'ejs');
-app.set('views', path.join(__dirname, 'views'));
-
-// Статические файлы
-app.use(express.static(path.join(__dirname, 'public')));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Создаем бота для этого сервера
+let bot;
+try {
+  // Если запущено на Vercel, можно не настраивать вебхук здесь,
+  // он настраивается в api/webhook.js
+  if (process.env.VERCEL_URL) {
+    bot = new TelegramBot(token);
+    console.log('🤖 Бот создан без поллинга (для Vercel)');
+  } else {
+    bot = new TelegramBot(token, { polling: true });
+    console.log('🤖 Бот запущен в режиме поллинга (для локальной разработки)');
+  }
+} catch (error) {
+  console.error('❌ Ошибка создания бота:', error);
+}
 
 // Глобальные переменные для статистики
 let stats = {
@@ -25,16 +37,19 @@ let stats = {
   isRunning: true
 };
 
+// Настройка EJS как шаблонизатора
+app.set('view engine', 'ejs');
+app.set('views', path.join(__dirname, 'views'));
+
+// Статические файлы
+app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+
 // Обновление статистики
 function updateStats() {
   try {
-    if (global.pendingForms) {
-      stats.pendingForms = Object.keys(global.pendingForms).length;
-    }
-    if (global.processedForms) {
-      stats.acceptedForms = global.processedForms.accepted.length;
-      stats.rejectedForms = global.processedForms.rejected.length;
-    }
+    // В упрощенном режиме просто показываем время запуска
     stats.lastActivity = new Date();
   } catch (error) {
     console.error('Ошибка при обновлении статистики:', error);
@@ -44,55 +59,101 @@ function updateStats() {
 // Главная страница - статус бота и статистика
 app.get('/', (req, res) => {
   updateStats();
-  res.render('index', { 
-    stats: stats,
-    uptime: getUptime(stats.botStartTime)
-  });
+  
+  // Проверяем работоспособность бота
+  let botStatus = 'unknown';
+  
+  if (bot) {
+    // Пытаемся получить информацию о боте
+    bot.getMe()
+      .then(botInfo => {
+        res.render('index', { 
+          stats: {
+            ...stats,
+            botInfo: botInfo
+          },
+          uptime: getUptime(stats.botStartTime)
+        });
+      })
+      .catch(error => {
+        console.error('Ошибка при проверке бота:', error);
+        res.render('index', { 
+          stats: {
+            ...stats,
+            botInfo: null,
+            error: error.message
+          },
+          uptime: getUptime(stats.botStartTime)
+        });
+      });
+  } else {
+    res.render('index', { 
+      stats: {
+        ...stats,
+        botInfo: null,
+        error: 'Бот не инициализирован'
+      },
+      uptime: getUptime(stats.botStartTime)
+    });
+  }
 });
 
 // API для перезапуска бота
 app.post('/api/restart', (req, res) => {
   try {
-    // Имитация перезапуска (в реальности здесь был бы код перезапуска бота)
     stats.isRunning = true;
     stats.botStartTime = new Date();
     
-    res.json({ success: true, message: 'Бот успешно перезапущен' });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Ошибка при перезапуске бота: ' + error.message });
-  }
-});
-
-// API для остановки бота
-app.post('/api/stop', (req, res) => {
-  try {
-    // Имитация остановки (в реальности здесь был бы код остановки бота)
-    stats.isRunning = false;
-    
-    res.json({ success: true, message: 'Бот успешно остановлен' });
-  } catch (error) {
-    res.status(500).json({ success: false, message: 'Ошибка при остановке бота: ' + error.message });
-  }
-});
-
-// Вебхук для Telegram
-app.post('/api/webhook', async (req, res) => {
-  try {
-    if (req.method === 'POST') {
-      const update = req.body;
-      
-      if (update && update.message) {
-        await bot.processUpdate(update);
-        stats.lastActivity = new Date();
-      }
-      
-      return res.status(200).json({ status: 'ok' });
+    if (bot) {
+      bot.getMe().then(botInfo => {
+        res.json({ 
+          success: true, 
+          message: 'Бот успешно перезапущен',
+          botInfo: botInfo
+        });
+      }).catch(error => {
+        res.status(500).json({ 
+          success: false, 
+          message: 'Ошибка при перезапуске бота: ' + error.message 
+        });
+      });
+    } else {
+      res.status(500).json({ 
+        success: false, 
+        message: 'Бот не инициализирован' 
+      });
     }
-    
-    return res.status(200).json({ status: 'Сервер бота работает!' });
   } catch (error) {
-    console.error('Ошибка в вебхуке:', error);
-    return res.status(500).json({ status: 'error', message: error.message });
+    res.status(500).json({ 
+      success: false, 
+      message: 'Ошибка при перезапуске бота: ' + error.message 
+    });
+  }
+});
+
+// API для проверки статуса бота
+app.get('/api/status', async (req, res) => {
+  try {
+    if (bot) {
+      const botInfo = await bot.getMe();
+      res.json({ 
+        status: 'online',
+        botInfo: botInfo,
+        uptime: getUptime(stats.botStartTime)
+      });
+    } else {
+      res.json({ 
+        status: 'offline',
+        error: 'Бот не инициализирован',
+        uptime: getUptime(stats.botStartTime)
+      });
+    }
+  } catch (error) {
+    res.json({ 
+      status: 'error',
+      error: error.message,
+      uptime: getUptime(stats.botStartTime)
+    });
   }
 });
 
@@ -107,12 +168,15 @@ function getUptime(startTime) {
   return `${days}д ${hours}ч ${minutes}м ${seconds}с`;
 }
 
-// Запуск сервера
+// Запуск сервера для локальной разработки
 if (!process.env.VERCEL_URL) {
   app.listen(port, () => {
-    console.log(`Сервер запущен на порту ${port}`);
+    console.log(`🌐 Сервер запущен на порту ${port}`);
   });
 }
+
+// Логирование завершения запуска
+console.log('✅ server.js загружен успешно');
 
 // Экспорт для Vercel
 module.exports = app; 

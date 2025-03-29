@@ -2,6 +2,10 @@
   "version": 2,
   "builds": [
     {
+      "src": "api/webhook.js",
+      "use": "@vercel/node"
+    },
+    {
       "src": "server.js",
       "use": "@vercel/node"
     }
@@ -9,7 +13,8 @@
   "routes": [
     {
       "src": "/api/webhook",
-      "dest": "/server.js"
+      "dest": "/api/webhook.js",
+      "methods": ["POST", "GET"]
     },
     {
       "src": "/(.*)",
@@ -18,5 +23,11 @@
   ],
   "env": {
     "TELEGRAM_BOT_TOKEN": "7417777601:AAGy92M0pjoizRHILNT7d72xMNf8a0BkKK8"
+  },
+  "functions": {
+    "api/webhook.js": {
+      "memory": 1024,
+      "maxDuration": 10
+    }
   }
 } 

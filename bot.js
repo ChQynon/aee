@@ -19,6 +19,18 @@ const GROUP_CHAT_ID = -1002081050841;
 // Групповая ссылка
 const GROUP_LINK = 'https://t.me/+mjIfXRUDx19iOGQy';
 
+// Хранилище для состояний пользователей
+const userStates = {};
+// Хранилище для анкет пользователей
+const userForms = {};
+// Хранилище для ожидающих анкет (id пользователя -> message_id для обновления)
+const pendingForms = {};
+// Хранилище для истории обработанных анкет
+const processedForms = {
+    accepted: [], // Принятые анкеты
+    rejected: []  // Отклоненные анкеты
+};
+
 // Инициализация бота в зависимости от среды
 let bot;
 let BOT_ID = null;
@@ -55,18 +67,6 @@ if (process.env.VERCEL_URL) {
     global.pendingForms = pendingForms;
     global.processedForms = processedForms;
 }
-
-// Хранилище для состояний пользователей
-const userStates = {};
-// Хранилище для анкет пользователей
-const userForms = {};
-// Хранилище для ожидающих анкет (id пользователя -> message_id для обновления)
-const pendingForms = {};
-// Хранилище для истории обработанных анкет
-const processedForms = {
-    accepted: [], // Принятые анкеты
-    rejected: []  // Отклоненные анкеты
-};
 
 // Состояния разговора
 const STATES = {
