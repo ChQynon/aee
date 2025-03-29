@@ -3,11 +3,7 @@
   "builds": [
     {
       "src": "api/*.js",
-      "use": "@vercel/node",
-      "config": {
-        "memory": 1024,
-        "maxDuration": 60
-      }
+      "use": "@vercel/node"
     },
     {
       "src": "server.js",
@@ -20,24 +16,15 @@
   ],
   "routes": [
     {
-      "src": "/api/webhook",
-      "dest": "/api/webhook.js"
-    },
-    {
-      "src": "/api/check",
-      "dest": "/api/check.js"
-    },
-    {
-      "src": "/api/debug",
-      "dest": "/api/debug.js"
+      "src": "/api/(.*)",
+      "dest": "/api/$1.js"
     },
     {
       "src": "/debug.html",
       "dest": "/public/debug.html"
     },
     {
-      "src": "/(.+)",
-      "dest": "/server.js"
+      "handle": "filesystem"
     },
     {
       "src": "/(.*)",
