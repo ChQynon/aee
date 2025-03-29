@@ -12,23 +12,32 @@
     {
       "src": "server.js",
       "use": "@vercel/node"
+    },
+    {
+      "src": "public/**",
+      "use": "@vercel/static"
     }
   ],
   "routes": [
     {
       "src": "/api/webhook",
-      "dest": "/api/webhook.js",
-      "methods": ["POST", "GET"]
+      "dest": "/api/webhook.js"
     },
     {
       "src": "/api/check",
-      "dest": "/api/check.js",
-      "methods": ["GET"]
+      "dest": "/api/check.js"
     },
     {
       "src": "/api/debug",
-      "dest": "/api/debug.js",
-      "methods": ["GET", "POST"]
+      "dest": "/api/debug.js"
+    },
+    {
+      "src": "/debug.html",
+      "dest": "/public/debug.html"
+    },
+    {
+      "src": "/(.+)",
+      "dest": "/server.js"
     },
     {
       "src": "/(.*)",
