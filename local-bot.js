@@ -3,6 +3,15 @@ const TelegramBot = require('node-telegram-bot-api');
 // Токен бота
 const token = '7417777601:AAGy92M0pjoizRHILNT7d72xMNf8a0BkKK8';
 
+// ВАЖНО: Код отключен - не используйте поллинг, когда активен вебхук!
+console.log('⚠️ НЕ ИСПОЛЬЗУЙТЕ ПОЛЛИНГ, КОГДА АКТИВЕН ВЕБХУК!');
+console.log('⚠️ Этот файл отключен. Вместо этого используйте API webhook.');
+console.log('⚠️ Откройте https://sunset-one.vercel.app/debug.html для управления ботом.');
+
+process.exit(0); // Немедленно завершаем работу
+
+// ОТКЛЮЧЕННЫЙ КОД НИЖЕ
+/*
 // Режим polling для локальной разработки
 const bot = new TelegramBot(token, { polling: true });
 
@@ -37,13 +46,11 @@ bot.on('message', (msg) => {
     const chatId = msg.chat.id;
     console.log(`Получено сообщение от ${msg.from.id}: ${msg.text}`);
     
-    // Отвечаем только на простые сообщения, не начинающиеся с "/"
-    if (msg.text && !msg.text.startsWith('/')) {
-        bot.sendMessage(chatId, `Вы отправили: ${msg.text}`);
-    }
+    // НЕ дублируем сообщения пользователей
 });
 
 process.on('SIGINT', () => {
     console.log('Бот остановлен');
     process.exit(0);
-}); 
+});
+*/ 
