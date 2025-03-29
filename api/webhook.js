@@ -19,7 +19,14 @@ const STATES = {
 const GROUP_CHAT_ID = '-1001922624396'; 
 
 // Список админов
-const ADMIN_IDS = [1103834712, 1103834713]; // Замените на реальные ID админов
+const ADMIN_IDS = [
+  7683124601,
+  1971986164,
+  1663401570,
+  6844219237,
+  1536993655,
+  718910310
+]; 
 
 // Хранилище состояний пользователей и анкет
 const userStates = {};
@@ -128,7 +135,7 @@ module.exports = async (req, res) => {
 
 // Проверка, является ли пользователь админом
 function isAdmin(userId) {
-  return ADMIN_IDS.includes(userId);
+  return ADMIN_IDS.includes(Number(userId));
 }
 
 // Генерация сообщения с анкетой
@@ -331,13 +338,21 @@ async function handleCallbackQuery(bot, chatId, data, callbackQuery, userId) {
     const adminId = callbackQuery.from.id;
     const adminUsername = callbackQuery.from.username || `ID: ${adminId}`;
     
-    if (!isAdmin(userId)) {
-      await bot.answerCallbackQuery(callbackQuery.id, { text: "У вас нет прав для этого действия" });
+    // Проверяем, является ли пользователь админом
+    if (!isAdmin(adminId)) {
+      await bot.answerCallbackQuery(callbackQuery.id, { 
+        text: "У вас нет прав для этого действия", 
+        show_alert: true 
+      });
       return;
     }
     
+    // Проверяем, существует ли анкета
     if (!pendingForms[targetUserId]) {
-      await bot.answerCallbackQuery(callbackQuery.id, { text: "Эта анкета больше недоступна" });
+      await bot.answerCallbackQuery(callbackQuery.id, { 
+        text: "Эта анкета больше недоступна", 
+        show_alert: true 
+      });
       return;
     }
     
@@ -378,6 +393,14 @@ async function handleCallbackQuery(bot, chatId, data, callbackQuery, userId) {
         );
       }
       
+      // Пытаемся добавить пользователя в групповой чат
+      try {
+        await bot.approveChatJoinRequest(GROUP_CHAT_ID, targetUserId);
+        console.log(`Пользователь ${targetUserId} был автоматически принят в групповой чат`);
+      } catch (error) {
+        console.error(`Не удалось автоматически одобрить заявку на вступление в группу: ${error.message}`);
+      }
+      
       // Отправляем сообщение в групповой чат
       await bot.sendMessage(
         GROUP_CHAT_ID,
@@ -406,13 +429,19 @@ async function handleCallbackQuery(bot, chatId, data, callbackQuery, userId) {
     const adminId = callbackQuery.from.id;
     const adminUsername = callbackQuery.from.username || `ID: ${adminId}`;
     
-    if (!isAdmin(userId)) {
-      await bot.answerCallbackQuery(callbackQuery.id, { text: "У вас нет прав для этого действия" });
+    if (!isAdmin(adminId)) {
+      await bot.answerCallbackQuery(callbackQuery.id, { 
+        text: "У вас нет прав для этого действия", 
+        show_alert: true 
+      });
       return;
     }
     
     if (!pendingForms[targetUserId]) {
-      await bot.answerCallbackQuery(callbackQuery.id, { text: "Эта анкета больше недоступна" });
+      await bot.answerCallbackQuery(callbackQuery.id, { 
+        text: "Эта анкета больше недоступна", 
+        show_alert: true 
+      });
       return;
     }
     
