@@ -86,29 +86,48 @@ function isAdmin(userId) {
 
 // Добавляем обработчики команд
 bot.onText(/\/start/, async (msg) => {
-    const chatId = msg.chat.id;
-    const userId = msg.from.id;
-    
-    // Проверяем, является ли пользователь администратором
-    if (isAdmin(userId)) {
-        await bot.sendMessage(chatId, 
-            "Привет, администратор! 👋\n\n" +
-            "Я бот для приема анкет в хаус Sunset. " +
-            "Ждите анкеты от пользователей, я буду пересылать их вам.\n\n" +
-            "Команды для администраторов:\n" +
-            "/list - просмотр списка непринятых анкет\n" +
-            "/history_accepted - просмотр принятых анкет\n" +
-            "/history_rejected - просмотр отклоненных анкет"
-        );
-    } else {
-        // Устанавливаем состояние "ожидание имени и ника"
-        userStates[chatId] = STATES.AWAITING_NAME;
-        userForms[chatId] = {}; // Инициализируем пустую анкету
+    try {
+        console.log('Получена команда /start от пользователя', msg.from.id);
+        const chatId = msg.chat.id;
+        const userId = msg.from.id;
         
-        await bot.sendMessage(chatId, 
-            "Привет! Я бот для приема анкет в хаус Sunset. " +
-            "Давай начнем заполнение анкеты.\n\n" +
-            "🍂 Укажи своё Имя + Ник:");
+        // Проверяем, является ли пользователь администратором
+        if (isAdmin(userId)) {
+            await bot.sendMessage(chatId, 
+                "Привет, администратор! 👋\n\n" +
+                "Я бот для приема анкет в хаус Sunset. " +
+                "Ждите анкеты от пользователей, я буду пересылать их вам.\n\n" +
+                "Команды для администраторов:\n" +
+                "/list - просмотр списка непринятых анкет\n" +
+                "/history_accepted - просмотр принятых анкет\n" +
+                "/history_rejected - просмотр отклоненных анкет"
+            );
+            console.log('Отправлено сообщение админу', userId);
+        } else {
+            // Устанавливаем состояние "ожидание имени и ника"
+            userStates[chatId] = STATES.AWAITING_NAME;
+            userForms[chatId] = {}; // Инициализируем пустую анкету
+            
+            await bot.sendMessage(chatId, 
+                "Привет! Я бот для приема анкет в хаус Sunset. " +
+                "Давай начнем заполнение анкеты.\n\n" +
+                "🍂 Укажи своё Имя + Ник:");
+            console.log('Отправлено начальное сообщение пользователю', userId);
+        }
+    } catch (error) {
+        console.error('Ошибка при обработке команды /start:', error);
+    }
+});
+
+// Упрощенная функция тестовой отправки сообщения
+bot.onText(/\/test/, async (msg) => {
+    try {
+        console.log('Получена команда /test от пользователя', msg.from.id);
+        const chatId = msg.chat.id;
+        await bot.sendMessage(chatId, "Тестовое сообщение! Бот работает!");
+        console.log('Отправлено тестовое сообщение пользователю', msg.from.id);
+    } catch (error) {
+        console.error('Ошибка при отправке тестового сообщения:', error);
     }
 });
 
@@ -711,45 +730,66 @@ bot.on('callback_query', async (callbackQuery) => {
 
 // Основной обработчик запросов
 module.exports = async (req, res) => {
-  // Отладочная информация
-  console.log(`Получен запрос: ${req.method} ${req.url}`);
-  
-  // Для GET-запросов просто возвращаем статус
-  if (req.method === 'GET') {
-    try {
-      const botInfo = await bot.getMe();
-      return res.json({
-        status: 'Бот работает',
-        bot: botInfo.username,
-        botId: botInfo.id,
-        timestamp: new Date().toISOString()
-      });
-    } catch (error) {
-      return res.json({
-        status: 'Ошибка',
-        error: error.message,
-        timestamp: new Date().toISOString()
-      });
+  try {
+    // Отладочная информация
+    console.log(`Получен запрос: ${req.method} ${req.url}`);
+    console.log('Заголовки запроса:', req.headers);
+    
+    // Для GET-запросов просто возвращаем статус
+    if (req.method === 'GET') {
+      try {
+        const botInfo = await bot.getMe();
+        return res.json({
+          status: 'Бот работает',
+          bot: botInfo.username,
+          botId: botInfo.id,
+          timestamp: new Date().toISOString()
+        });
+      } catch (error) {
+        console.error('Ошибка при получении информации о боте:', error);
+        return res.json({
+          status: 'Ошибка',
+          error: error.message,
+          timestamp: new Date().toISOString()
+        });
+      }
     }
-  }
-  
-  // Для POST-запросов обрабатываем апдейты от Telegram
-  if (req.method === 'POST') {
-    try {
-      const update = req.body;
-      console.log('Получен апдейт:', JSON.stringify(update).substring(0, 200) + '...');
-      
-      // Обрабатываем обновление
-      await bot.processUpdate(update);
-      
-      // Отвечаем Telegram успешным статусом
-      return res.status(200).json({ ok: true });
-    } catch (error) {
-      console.error('Ошибка обработки апдейта:', error);
-      return res.status(500).json({ ok: false, error: error.message });
+    
+    // Для POST-запросов обрабатываем апдейты от Telegram
+    if (req.method === 'POST') {
+      try {
+        const update = req.body;
+        if (!update) {
+          console.error('Пустое тело запроса');
+          return res.status(400).json({ ok: false, error: 'Пустое тело запроса' });
+        }
+        
+        console.log('Получен апдейт:', JSON.stringify(update, null, 2));
+        
+        if (update.message) {
+          console.log('Тип сообщения:', update.message.text ? 'Текстовое' : 'Другое');
+          console.log('От пользователя:', update.message.from?.id, update.message.from?.username);
+        }
+        
+        // Используем обещание для обработки обновления
+        await new Promise((resolve) => {
+          bot.processUpdate(update);
+          resolve();
+        });
+        
+        // Отвечаем Telegram успешным статусом немедленно
+        console.log('Апдейт обработан успешно');
+        return res.status(200).json({ ok: true });
+      } catch (error) {
+        console.error('Ошибка обработки апдейта:', error);
+        return res.status(500).json({ ok: false, error: error.message });
+      }
     }
+    
+    // Для других методов
+    return res.status(405).json({ ok: false, error: 'Method not allowed' });
+  } catch (error) {
+    console.error('Необработанная ошибка в обработчике запросов:', error);
+    return res.status(500).json({ ok: false, error: 'Внутренняя ошибка сервера' });
   }
-  
-  // Для других методов
-  return res.status(405).json({ ok: false, error: 'Method not allowed' });
 }; 
