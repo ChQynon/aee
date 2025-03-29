@@ -1,32 +1,31 @@
-// Файл для обработки вебхуков в Vercel
-const TelegramBot = require('node-telegram-bot-api');
-const http = require('http');
-
-// Получаем токен из переменных окружения
-const token = process.env.TELEGRAM_BOT_TOKEN || '7417777601:AAGy92M0pjoizRHILNT7d72xMNf8a0BkKK8';
-
-// Обработка запросов
+// Обработчик webhook для Vercel
 module.exports = async (req, res) => {
   try {
-    // Если метод не POST, возвращаем сообщение о статусе
+    // Проверка на GET запрос (для проверки работоспособности)
     if (req.method !== 'POST') {
-      res.status(200).json({ status: 'Bot is running' });
-      return;
+      return res.status(200).json({ status: 'Bot is running' });
     }
-
-    // Получаем данные обновления
+    
+    // Получение данных обновления от Telegram
     const update = req.body;
-
-    // Импортируем основной код бота
-    const botHandler = require('../bot');
     
-    // Передаем обновление боту
-    await botHandler.handleUpdate(update);
+    // Импорт модуля бота
+    const TelegramBot = require('node-telegram-bot-api');
+    const token = process.env.TELEGRAM_BOT_TOKEN || '7417777601:AAGy92M0pjoizRHILNT7d72xMNf8a0BkKK8';
     
-    // Отвечаем Telegram серверу что всё хорошо
-    res.status(200).end('OK');
+    // Создание экземпляра бота с webhook-режимом
+    const bot = new TelegramBot(token);
+    
+    // Передача обновления боту
+    await bot.processUpdate(update);
+    
+    // Отправка успешного ответа
+    return res.status(200).send('OK');
   } catch (error) {
-    console.error('Ошибка в обработке webhook:', error);
-    res.status(500).json({ error: 'Ошибка в обработке webhook' });
+    console.error('Webhook error:', error);
+    return res.status(500).json({ 
+      error: String(error),
+      stack: error.stack
+    });
   }
 }; 
