@@ -4,10 +4,10 @@
     { "src": "api/webhook.js", "use": "@vercel/node" }
   ],
   "routes": [
-    { "src": "/api/webhook", "dest": "/api/webhook.js" },
-    { "src": "/(.*)", "dest": "/api/webhook.js" }
+    { "src": "/api/webhook", "dest": "/api/webhook.js" }
   ],
   "env": {
+    "NODE_ENV": "production",
     "TELEGRAM_BOT_TOKEN": "7417777601:AAGy92M0pjoizRHILNT7d72xMNf8a0BkKK8"
   }
 } 
