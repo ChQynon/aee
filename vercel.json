@@ -2,7 +2,7 @@
   "version": 2,
   "builds": [
     {
-      "src": "api/webhook.js",
+      "src": "api/*.js",
       "use": "@vercel/node",
       "config": {
         "memory": 1024,
@@ -19,6 +19,16 @@
       "src": "/api/webhook",
       "dest": "/api/webhook.js",
       "methods": ["POST", "GET"]
+    },
+    {
+      "src": "/api/check",
+      "dest": "/api/check.js",
+      "methods": ["GET"]
+    },
+    {
+      "src": "/api/debug",
+      "dest": "/api/debug.js",
+      "methods": ["GET", "POST"]
     },
     {
       "src": "/(.*)",
