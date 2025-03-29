@@ -42,6 +42,15 @@ function isAdmin(userId) {
     return ADMIN_IDS.includes(Number(userId));
 }
 
+// Функция для сохранения всех текущих данных в лог для отладки
+function logDebugState() {
+    console.log('==== DEBUG STATE ====');
+    console.log(`pendingForms keys: ${JSON.stringify(Object.keys(pendingForms))}`);
+    console.log(`userStates keys: ${JSON.stringify(Object.keys(userStates))}`);
+    console.log(`userForms keys: ${JSON.stringify(Object.keys(userForms))}`);
+    console.log('==== END DEBUG STATE ====');
+}
+
 // Обработчик запросов
 module.exports = async (req, res) => {
     try {
@@ -401,9 +410,20 @@ module.exports = async (req, res) => {
             // Обработка callback_query (нажатия на кнопки)
             if (update.callback_query) {
                 const callbackQuery = update.callback_query;
-                const chatId = callbackQuery.message.chat.id;
+                const message = callbackQuery.message;
+                const chatId = message.chat.id;
                 const userId = callbackQuery.from.id;
                 const data = callbackQuery.data;
+                
+                console.log(`Обработка callback_query: ${data} от пользователя ${userId} в чате ${chatId}`);
+                
+                // Проверяем, является ли это групповой чат
+                const isGroupChat = (message.chat.type === 'group' || message.chat.type === 'supergroup');
+                
+                // Проверяем, что callback содержит accept_ или reject_
+                if ((data.startsWith('accept_') || data.startsWith('reject_'))) {
+                    console.log(`Обнаружена кнопка принятия/отклонения в ${isGroupChat ? 'групповом' : 'личном'} чате`);
+                }
                 
                 if (data === 'confirm' && userStates[chatId] === STATES.AWAITING_CONFIRMATION) {
                     const username = callbackQuery.from.username || "без имени пользователя";
@@ -435,30 +455,35 @@ module.exports = async (req, res) => {
                         }
                     }
                     
+                    // Сохраняем сначала пользователя в pendingForms
+                    // Используем строковый ID для гарантии совместимости
+                    const userIdStr = String(userId);
+                    pendingForms[userIdStr] = {
+                        adminMessages: {},
+                        userData: {
+                            username,
+                            form
+                        },
+                        userChatId: chatId
+                    };
+
+                    console.log(`Создана новая анкета для пользователя ID: ${userIdStr}`);
+                    logDebugState();
+                    
                     for (const adminId of ADMIN_IDS) {
                         try {
                             const adminMsg = await bot.sendMessage(adminId, formText, {
                                 reply_markup: {
                                     inline_keyboard: [
                                         [
-                                            { text: 'Принять в хаус ✅', callback_data: `accept_${userId}` },
-                                            { text: 'Отклонить ❌', callback_data: `reject_${userId}` }
+                                            { text: 'Принять в хаус ✅', callback_data: `accept_${userIdStr}` },
+                                            { text: 'Отклонить ❌', callback_data: `reject_${userIdStr}` }
                                         ]
                                     ]
                                 }
                             });
                             
-                            if (!pendingForms[userId]) {
-                                pendingForms[userId] = {
-                                    adminMessages: {},
-                                    userData: {
-                                        username,
-                                        form
-                                    }
-                                };
-                            }
-                            
-                            pendingForms[userId].adminMessages[adminId] = {
+                            pendingForms[userIdStr].adminMessages[adminId] = {
                                 chat_id: adminId,
                                 message_id: adminMsg.message_id
                             };
@@ -487,10 +512,6 @@ module.exports = async (req, res) => {
                     
                     userStates[chatId] = STATES.IDLE;
                     
-                    if (pendingForms[userId]) {
-                        pendingForms[userId].userChatId = chatId;
-                    }
-                    
                     await bot.answerCallbackQuery(callbackQuery.id);
                 }
                 else if (data === 'restart') {
@@ -512,7 +533,12 @@ module.exports = async (req, res) => {
                     const adminId = callbackQuery.from.id;
                     const adminUsername = callbackQuery.from.username || `ID: ${adminId}`;
                     
+                    console.log(`Попытка принятия анкеты: targetUserId=${targetUserId}, adminId=${adminId}, isGroupChat=${isGroupChat}`);
+                    console.log(`Текущие pendingForms: ${JSON.stringify(Object.keys(pendingForms))}`);
+                    logDebugState();
+                    
                     if (!isAdmin(adminId)) {
+                        console.log(`Отказано в доступе: ${adminId} не является админом`);
                         await bot.answerCallbackQuery(callbackQuery.id, { 
                             text: "У вас нет прав для этого действия", 
                             show_alert: true 
@@ -520,7 +546,22 @@ module.exports = async (req, res) => {
                         return res.status(200).send('OK');
                     }
                     
-                    if (!pendingForms[targetUserId]) {
+                    // Здесь всегда работаем со строковыми ID
+                    const targetUserIdStr = String(targetUserId);
+                    
+                    if (!pendingForms[targetUserIdStr]) {
+                        console.log(`Анкета не найдена: ${targetUserIdStr} отсутствует в pendingForms`);
+                        await bot.answerCallbackQuery(callbackQuery.id, { 
+                            text: "Эта анкета больше недоступна", 
+                            show_alert: true 
+                        });
+                        return res.status(200).send('OK');
+                    }
+                    
+                    const formData = pendingForms[targetUserIdStr];
+                    
+                    if (!formData || !formData.userData) {
+                        console.log(`Некорректная структура данных анкеты для ID: ${targetUserIdStr}`);
                         await bot.answerCallbackQuery(callbackQuery.id, { 
                             text: "Эта анкета больше недоступна", 
                             show_alert: true 
@@ -529,11 +570,13 @@ module.exports = async (req, res) => {
                     }
                     
                     try {
-                        const { userData, adminMessages, userChatId } = pendingForms[targetUserId];
+                        const { userData, adminMessages, userChatId } = formData;
                         const username = userData.username;
                         
+                        console.log(`Принятие анкеты: username=${username}, userChatId=${userChatId}`);
+                        
                         processedForms.accepted.push({
-                            userId: targetUserId,
+                            userId: targetUserIdStr,
                             username: username,
                             formData: userData.form,
                             adminId: adminId,
@@ -544,7 +587,7 @@ module.exports = async (req, res) => {
                         for (const [id, msgData] of Object.entries(adminMessages)) {
                             try {
                                 await bot.editMessageText(
-                                    `✅ АНКЕТА ПРИНЯТА ✅\n\nПользователь @${username} (ID: ${targetUserId}) был принят в хаус админом @${adminUsername} (ID: ${adminId})`,
+                                    `✅ АНКЕТА ПРИНЯТА ✅\n\nПользователь @${username} (ID: ${targetUserIdStr}) был принят в хаус админом @${adminUsername} (ID: ${adminId})`,
                                     {
                                         chat_id: msgData.chat_id,
                                         message_id: msgData.message_id
@@ -569,9 +612,10 @@ module.exports = async (req, res) => {
                                 console.log(`ID бота получен: ${BOT_ID}`);
                             }
                             
+                            console.log(`Попытка одобрения заявки в группу: ${GROUP_CHAT_ID}, userId=${targetUserIdStr}`);
                             const chatAdmins = await bot.getChatAdministrators(GROUP_CHAT_ID);
                             if (chatAdmins.some(admin => admin.user.id === BOT_ID)) {
-                                await bot.approveChatJoinRequest(GROUP_CHAT_ID, targetUserId);
+                                await bot.approveChatJoinRequest(GROUP_CHAT_ID, targetUserIdStr);
                                 await bot.sendMessage(
                                     GROUP_CHAT_ID,
                                     `🎉 Поздравляем @${username} с официальным принятием в хаус Sunset! 🎉\nПринят админом: @${adminUsername} (ID: ${adminId})`
@@ -623,7 +667,8 @@ module.exports = async (req, res) => {
                             });
                         }
                         
-                        delete pendingForms[targetUserId];
+                        delete pendingForms[targetUserIdStr];
+                        logDebugState();
                         
                     } catch (error) {
                         console.error(`Ошибка при принятии анкеты: ${error}`);
@@ -639,7 +684,11 @@ module.exports = async (req, res) => {
                     const adminId = callbackQuery.from.id;
                     const adminUsername = callbackQuery.from.username || `ID: ${adminId}`;
                     
+                    console.log(`Попытка отклонения анкеты: targetUserId=${targetUserId}, adminId=${adminId}, isGroupChat=${isGroupChat}`);
+                    logDebugState();
+                    
                     if (!isAdmin(adminId)) {
+                        console.log(`Отказано в доступе: ${adminId} не является админом`);
                         await bot.answerCallbackQuery(callbackQuery.id, { 
                             text: "У вас нет прав для этого действия", 
                             show_alert: true 
@@ -647,7 +696,11 @@ module.exports = async (req, res) => {
                         return res.status(200).send('OK');
                     }
                     
-                    if (!pendingForms[targetUserId]) {
+                    // Здесь всегда работаем со строковыми ID
+                    const targetUserIdStr = String(targetUserId);
+                    
+                    if (!pendingForms[targetUserIdStr]) {
+                        console.log(`Анкета не найдена: ${targetUserIdStr} отсутствует в pendingForms`);
                         await bot.answerCallbackQuery(callbackQuery.id, { 
                             text: "Эта анкета больше недоступна", 
                             show_alert: true 
@@ -655,11 +708,22 @@ module.exports = async (req, res) => {
                         return res.status(200).send('OK');
                     }
                     
-                    const { userData, adminMessages, userChatId } = pendingForms[targetUserId];
+                    const formData = pendingForms[targetUserIdStr];
+                    
+                    if (!formData || !formData.userData) {
+                        console.log(`Некорректная структура данных анкеты для ID: ${targetUserIdStr}`);
+                        await bot.answerCallbackQuery(callbackQuery.id, { 
+                            text: "Эта анкета больше недоступна", 
+                            show_alert: true 
+                        });
+                        return res.status(200).send('OK');
+                    }
+                    
+                    const { userData, adminMessages, userChatId } = formData;
                     const username = userData.username;
                     
                     processedForms.rejected.push({
-                        userId: targetUserId,
+                        userId: targetUserIdStr,
                         username: username,
                         formData: userData.form,
                         adminId: adminId,
@@ -670,7 +734,7 @@ module.exports = async (req, res) => {
                     for (const [id, msgData] of Object.entries(adminMessages)) {
                         try {
                             await bot.editMessageText(
-                                `❌ АНКЕТА ОТКЛОНЕНА ❌\n\nАнкета пользователя @${username} (ID: ${targetUserId}) была отклонена админом @${adminUsername} (ID: ${adminId})`,
+                                `❌ АНКЕТА ОТКЛОНЕНА ❌\n\nАнкета пользователя @${username} (ID: ${targetUserIdStr}) была отклонена админом @${adminUsername} (ID: ${adminId})`,
                                 {
                                     chat_id: msgData.chat_id,
                                     message_id: msgData.message_id
@@ -689,12 +753,13 @@ module.exports = async (req, res) => {
                     }
                     
                     try {
-                        await bot.declineChatJoinRequest(GROUP_CHAT_ID, targetUserId);
+                        await bot.declineChatJoinRequest(GROUP_CHAT_ID, targetUserIdStr);
                     } catch (error) {
                         console.error(`Ошибка при отклонении заявки в групповой чат: ${error}`);
                     }
                     
-                    delete pendingForms[targetUserId];
+                    delete pendingForms[targetUserIdStr];
+                    logDebugState();
                     
                     await bot.answerCallbackQuery(callbackQuery.id, { 
                         text: "Анкета отклонена", 
