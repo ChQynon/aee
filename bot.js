@@ -1,7 +1,7 @@
 const TelegramBot = require('node-telegram-bot-api');
 
 // Токен бота
-const token = process.env.TELEGRAM_BOT_TOKEN || '7417777601:AAGy92M0pjoizRHILNT7d72xMNf8a0BkKK8';
+const token = '7417777601:AAGy92M0pjoizRHILNT7d72xMNf8a0BkKK8';
 
 // ID админов
 const ADMIN_IDS = [
@@ -19,6 +19,20 @@ const GROUP_CHAT_ID = -1002081050841;
 // Групповая ссылка
 const GROUP_LINK = 'https://t.me/+mjIfXRUDx19iOGQy';
 
+// Создаем экземпляр бота
+const bot = new TelegramBot(token, { polling: true });
+
+// Переменная для хранения ID бота
+let BOT_ID = null;
+
+// Получаем информацию о боте при запуске
+bot.getMe().then(botInfo => {
+    BOT_ID = botInfo.id;
+    console.log(`Бот ${botInfo.username} (ID: ${BOT_ID}) успешно запущен!`);
+}).catch(error => {
+    console.error(`Ошибка при получении информации о боте: ${error}`);
+});
+
 // Хранилище для состояний пользователей
 const userStates = {};
 // Хранилище для анкет пользователей
@@ -30,43 +44,6 @@ const processedForms = {
     accepted: [], // Принятые анкеты
     rejected: []  // Отклоненные анкеты
 };
-
-// Инициализация бота в зависимости от среды
-let bot;
-let BOT_ID = null;
-
-// Настройка для Vercel (вебхук) или локальной разработки (поллинг)
-if (process.env.VERCEL_URL) {
-    // Режим вебхука для Vercel
-    const url = `https://${process.env.VERCEL_URL}`;
-    bot = new TelegramBot(token);
-    bot.setWebHook(`${url}/api/webhook`);
-} else {
-    // Режим поллинга для локальной разработки
-    bot = new TelegramBot(token, { polling: true });
-}
-
-// Получаем информацию о боте при запуске
-bot.getMe().then(botInfo => {
-    BOT_ID = botInfo.id;
-    console.log(`Бот ${botInfo.username} (ID: ${BOT_ID}) успешно запущен!`);
-}).catch(error => {
-    console.error(`Ошибка при получении информации о боте: ${error}`);
-});
-
-// Для Vercel - обработка вебхука
-if (process.env.VERCEL_URL) {
-    // Экспортируем бота и данные для использования в других файлах
-    module.exports = { 
-        bot,
-        pendingForms,
-        processedForms
-    };
-} else {
-    // Делаем данные доступными глобально для локальной разработки
-    global.pendingForms = pendingForms;
-    global.processedForms = processedForms;
-}
 
 // Состояния разговора
 const STATES = {
