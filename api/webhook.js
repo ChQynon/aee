@@ -1,7 +1,16 @@
 const TelegramBot = require('node-telegram-bot-api');
 
+// Отладочная информация - записываем все, что происходит
+console.log('Webhook запущен: ' + new Date().toISOString());
+console.log('Версия Node.js:', process.version);
+console.log('Переменные окружения:', {
+  VERCEL_URL: process.env.VERCEL_URL,
+  NODE_ENV: process.env.NODE_ENV
+});
+
 // Токен бота
 const token = process.env.TELEGRAM_BOT_TOKEN || '7417777601:AAGy92M0pjoizRHILNT7d72xMNf8a0BkKK8';
+console.log('Используется токен бота:', token.substring(0, 10) + '...');
 
 // ID админов
 const ADMIN_IDS = [
