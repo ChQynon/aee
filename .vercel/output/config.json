@@ -1,0 +1,15 @@
+{
+  "version": 3,
+  "routes": [
+    {
+      "src": "/(.*)",
+      "dest": "/api/webhook.js"
+    }
+  ],
+  "builds": [
+    {
+      "src": "package.json",
+      "use": "@vercel/node"
+    }
+  ]
+} 
